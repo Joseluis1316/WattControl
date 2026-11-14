@@ -1,69 +1,87 @@
-// =============================================================
-// main.cpp: Orquestador de la simulacion WattControl
-// =============================================================
-#include <iostream>
-#include <vector>
-#include <iomanip>
-#include "configuracion.h"
-#include "Tanque.h"
+// main.cpp: WattControl v2 (taller de mecanizado), cada clase en su archivo
+#include "CargaCritica.h"
+#include "CargaAplazable.h"
 #include "Mercado.h"
-#include "Equipo.h"
-#include "Bomba.h"
-#include "Iluminacion.h"
+#include "Negocio.h"
 
-using namespace std;
 
+// main: el programa empieza aqui
 int main() {
     srand(SEMILLA);
-    Tanque tanque(NIVEL_INICIAL);
+
+    // El mercado existe por su cuenta
     Mercado mercado;
+    // Las cargas se crean afuera del negocio
+    CargaCritica critica(NOMBRE_CRITICA, POTENCIA_CRITICA);
+    CargaAplazable aplazable1(NOMBRE_APLAZABLE_1, POTENCIA_APLAZABLE_1, HORAS_MIN_APLAZABLE_1);
+    CargaAplazable aplazable2(NOMBRE_APLAZABLE_2, POTENCIA_APLAZABLE_2, HORAS_MIN_APLAZABLE_2);
+    // El negocio conoce al mercado (asociacion)
+    Negocio negocio(NOMBRE_NEGOCIO, &mercado);
+    // Se le agregan las cargas (agregacion); la critica va primero
+    negocio.agregarCarga(&critica);
+    negocio.agregarCarga(&aplazable1);
+    negocio.agregarCarga(&aplazable2);
+    negocio.mostrar();
 
-    vector<Equipo*> equipos;
-    equipos.push_back(new Bomba("Bomba de Agua", POTENCIA_BOMBA));
-    equipos.push_back(new Iluminacion("Iluminacion Edificio", POTENCIA_LUCES));
+    // Lectura manual: valores de ejemplo
+    int hora = 12;
+    float precio = 500, embalses = 70;
+    bool haySimulacion = false;
+    int opcion;
 
-    cout << "===================================================\n";
-    cout << "         INICIANDO SIMULACION WATTCONTROL          \n";
-    cout << "===================================================\n\n";
+    do {
+        cout << endl << "===== WattControl v2 =====" << endl;
+        cout << "1. Ingresar lectura manual (hora, precio, embalses)" << endl;
+        cout << "2. Evaluar decision de cada carga" << endl;
+        cout << "3. Simular un dia completo (24 h)" << endl;
+        cout << "4. Ver resumen de la ultima simulacion" << endl;
+        cout << "0. Salir" << endl;
+        cout << "Opcion: ";
+        cin >> opcion;
 
-    float costoTotal = 0;
-
-    for (int hora = 0; hora < HORAS_DIA; hora++) {
-        float precio = mercado.precioHora(hora);
-        float consumoAguaHora = mercado.consumoAgua(hora);
-
-        tanque.consumir(consumoAguaHora);
-
-        cout << "[Hora " << setw(2) << setfill('0') << hora << ":00] ";
-        cout << "Precio: $" << fixed << setprecision(1) << precio << " | ";
-        cout << "Tanque: " << tanque.getNivel() << "% | ";
-
-        for (size_t i = 0; i < equipos.size(); i++) {
-            Equipo* eq = equipos[i];
-            if (eq->debeEncender(hora, precio, tanque.getNivel())) {
-                eq->encender();
-                if (eq->getNombre() == "Bomba de Agua") {
-                    tanque.llenar(SUBIDA_HORA);
-                }
-            } else {
-                eq->apagar();
-            }
-
-            float costo = eq->costoHora(precio);
-            costoTotal += costo;
-            cout << eq->getNombre() << (eq->estaEncendido() ? " [ON]" : " [OFF]") << " ";
+        switch (opcion) {
+        case 1:
+            do {
+                cout << "Hora (" << HORA_MIN << " a " << HORA_MAX << "): ";
+                cin >> hora;
+                if (hora < HORA_MIN || hora > HORA_MAX) cout << "  Hora invalida." << endl;
+            } while (hora < HORA_MIN || hora > HORA_MAX);
+            do {
+                cout << "Precio de bolsa (COP/kWh): ";
+                cin >> precio;
+                if (precio <= 0) cout << "  El precio debe ser mayor que 0." << endl;
+            } while (precio <= 0);
+            do {
+                cout << "Nivel de los embalses (" << EMBALSE_PORC_MIN << " a " << EMBALSE_PORC_MAX << " %): ";
+                cin >> embalses;
+                if (embalses < EMBALSE_PORC_MIN || embalses > EMBALSE_PORC_MAX) cout << "  Embalses invalidos." << endl;
+            } while (embalses < EMBALSE_PORC_MIN || embalses > EMBALSE_PORC_MAX);
+            cout << "Lectura guardada." << endl;
+            break;
+        case 2:
+            cout << "Hora " << hora << " | precio " << precio << " | embalses " << embalses << " %" << endl;
+            negocio.evaluar(hora, precio, embalses);
+            break;
+        case 3:
+            negocio.simularDia();
+            haySimulacion = true;
+            break;
+        case 4:
+            if (haySimulacion) negocio.resumen();
+            else cout << "Primero simule un dia con la opcion 3." << endl;
+            break;
+        case 0:
+            cout << "Hasta luego." << endl;
+            break;
+        default:
+            cout << "Opcion invalida." << endl;
         }
-        cout << "\n";
-    }
-
-    cout << "\n===================================================\n";
-    cout << "FIN DE LA SIMULACION. Costo Total: $" << costoTotal << "\n";
-    cout << "===================================================\n";
-
-    // Liberar memoria dinamica
-    for (size_t i = 0; i < equipos.size(); i++) {
-        delete equipos[i];
-    }
+        if (opcion != 0) {
+            cout << endl << "Presione Enter para continuar...";
+            cin.ignore();
+            cin.get();
+        }
+    } while (opcion != 0);
 
     return 0;
 }
